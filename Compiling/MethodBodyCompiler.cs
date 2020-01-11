@@ -6,8 +6,10 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
 using System.Collections.Generic;
-namespace Lab3.Compiling {
-	sealed class MethodBodyCompiler : IStatementVisitor, IExpressionVisitor<TypeRef> {
+namespace Lab3.Compiling
+{
+	sealed class MethodBodyCompiler : IStatementVisitor, IExpressionVisitor<TypeRef>
+	{
 		readonly SourceFile sourceFile;
 		readonly AllTypes types;
 		readonly ModuleDefinition module;
@@ -15,7 +17,8 @@ namespace Lab3.Compiling {
 		readonly ILProcessor cil;
 		readonly Dictionary<string, VariableDefinition> variables
 			= new Dictionary<string, VariableDefinition>();
-		MethodBodyCompiler(SourceFile sourceFile, AllTypes types, MethodDefinition method) {
+		MethodBodyCompiler(SourceFile sourceFile, AllTypes types, MethodDefinition method)
+		{
 			this.sourceFile = sourceFile;
 			this.types = types;
 			module = types.Module;
@@ -27,66 +30,85 @@ namespace Lab3.Compiling {
 			AllTypes types,
 			MethodDefinition md,
 			IEnumerable<IStatement> statements
-			) {
+			)
+		{
 			new MethodBodyCompiler(sourceFile, types, md).CompileMethodStatements(statements);
 		}
-		void CompileMethodStatements(IEnumerable<IStatement> statements) {
+		void CompileMethodStatements(IEnumerable<IStatement> statements)
+		{
 			throw new NotImplementedException();
 		}
-		Exception MakeError(INode node, string message) {
+		Exception MakeError(INode node, string message)
+		{
 			return new Exception(sourceFile.MakeErrorMessage(node.Position, message));
 		}
-		Exception WrongType(INode expression, TypeRef actual, TypeRef expected) {
+		Exception WrongType(INode expression, TypeRef actual, TypeRef expected)
+		{
 			var message = $@"Выражение {expression.FormattedString} имеет тип {
 				types.GetTypeName(actual)} вместо {types.GetTypeName(expected)}";
 			return MakeError(expression, message);
 		}
 		#region statements
-		void CompileStatement(IStatement statement) {
+		void CompileStatement(IStatement statement)
+		{
 			statement.Accept(this);
 		}
-		void CompileBlock(Block block) {
+		void CompileBlock(Block block)
+		{
 			throw new NotImplementedException();
 		}
-		public void VisitAssignment(Assignment statement) {
+		public void VisitAssignment(Assignment statement)
+		{
 			throw new NotImplementedException();
 		}
-		public void VisitExpressionStatement(ExpressionStatement statement) {
+		public void VisitExpressionStatement(ExpressionStatement statement)
+		{
 			throw new NotImplementedException();
 		}
-		public void VisitIf(If statement) {
+		public void VisitIf(If statement)
+		{
 			throw new NotImplementedException();
 		}
-		public void VisitReturn(Return statement) {
+		public void VisitReturn(Return statement)
+		{
 			throw new NotImplementedException();
 		}
-		public void VisitWhile(While statement) {
+		public void VisitWhile(While statement)
+		{
 			throw new NotImplementedException();
 		}
 		#endregion
 		#region expressions
-		TypeRef CompileExpression(IExpression expression) {
+		TypeRef CompileExpression(IExpression expression)
+		{
 			return expression.Accept(this);
 		}
-		public TypeRef VisitBinary(Binary node) {
+		public TypeRef VisitBinary(Binary node)
+		{
 			throw new NotImplementedException();
 		}
-		public TypeRef VisitCall(Call expression) {
+		public TypeRef VisitCall(Call expression)
+		{
 			throw new NotImplementedException();
 		}
-		public TypeRef VisitParentheses(Parentheses expression) {
+		public TypeRef VisitParentheses(Parentheses expression)
+		{
 			throw new NotImplementedException();
 		}
-		public TypeRef VisitNumber(Number expression) {
+		public TypeRef VisitNumber(Number expression)
+		{
 			throw new NotImplementedException();
 		}
-		public TypeRef VisitIdentifier(Identifier expression) {
+		public TypeRef VisitIdentifier(Identifier expression)
+		{
 			throw new NotImplementedException();
 		}
-		public TypeRef VisitMemberAccess(MemberAccess expression) {
+		public TypeRef VisitMemberAccess(MemberAccess expression)
+		{
 			throw new NotImplementedException();
 		}
-		public TypeRef VisitTypedExpression(TypedExpression expression) {
+		public TypeRef VisitTypedExpression(TypedExpression expression)
+		{
 			throw new NotImplementedException();
 		}
 		#endregion
