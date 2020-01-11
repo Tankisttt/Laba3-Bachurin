@@ -36,7 +36,9 @@ namespace Lab3.Compiling
 		}
 		void CompileMethodStatements(IEnumerable<IStatement> statements)
 		{
-			throw new NotImplementedException();
+			foreach (var st in statements)
+				CompileStatement(st);
+			cil.Emit(OpCodes.Ret);
 		}
 		Exception MakeError(INode node, string message)
 		{
@@ -55,27 +57,122 @@ namespace Lab3.Compiling
 		}
 		void CompileBlock(Block block)
 		{
-			throw new NotImplementedException();
+			foreach (var statement in block.Statements)
+				statement.Accept(this);
 		}
 		public void VisitAssignment(Assignment statement)
 		{
-			throw new NotImplementedException();
+			var id = statement.Target as Identifier;
+			if (id != null)
+			{
+				TypeRef exprType = CompileExpression(statement.Expr);
+				VariableDefinition newVar;
+				TypeRef? typeToCompare;
+				if (variables.ContainsKey(id.Name))
+				{
+					if (statement.Type != null)
+					{
+						typeToCompare = types.TryGetTypeRef(statement.Type);
+						if (typeToCompare == null)
+							throw MakeError(statement.Type, "wrong type");
+					}
+					else
+						typeToCompare = variables[id.Name].VariableType;
+
+					if (variables[id.Name].VariableType != typeToCompare.Value)
+						throw MakeError(statement.Type, "wrong type");
+
+					if (types.CanAssign(exprType, typeToCompare.Value))
+						newVar = variables[id.Name];
+					else
+						throw WrongType(statement, exprType, typeToCompare.Value);
+				}
+				else
+				{
+					if (statement.Type != null)
+					{
+						typeToCompare = types.TryGetTypeRef(statement.Type);
+
+						if (typeToCompare == null)
+							throw MakeError(statement.Type, "wrong type");
+
+						if (!types.CanAssign(exprType, typeToCompare.Value))
+							throw WrongType(statement, exprType, typeToCompare.Value);
+					}
+					else
+						typeToCompare = exprType.TypeReference;
+
+					newVar = new VariableDefinition(typeToCompare.Value.TypeReference);
+					method.Body.Variables.Add(newVar);
+					variables[id.Name] = newVar;
+				}
+
+				cil.Emit(OpCodes.Stloc, newVar);
+				return;
+			}
+			var member = statement.Target as MemberAccess;
+			if (member != null)
+			{
+				var obj = CompileExpression(member.Obj);
+				var typeDef = obj.GetTypeDefinition();
+				TypeRef exprType = CompileExpression(statement.Expr);
+				foreach (var field in typeDef.Fields)
+				{
+					if (field.Name == member.Member)
+					{
+						if (types.CanAssign(exprType, field.FieldType))
+							cil.Emit(OpCodes.Stfld, field);
+						else
+							throw WrongType(statement, exprType, field.FieldType);
+						return;
+					}
+				}
+			}
+			throw MakeError(statement, $"{statement.Target.FormattedString}");
 		}
 		public void VisitExpressionStatement(ExpressionStatement statement)
 		{
-			throw new NotImplementedException();
+			var t = CompileExpression(statement.Expr);
+			if (t != types.Void)
+				cil.Emit(OpCodes.Pop);
 		}
 		public void VisitIf(If statement)
 		{
-			throw new NotImplementedException();
+			var nop = Instruction.Create(OpCodes.Nop);
+			var expr = this.CompileExpression(statement.Condition);
+
+			if (expr == types.Bool)
+			{
+				cil.Emit(OpCodes.Brfalse, nop);
+				this.CompileBlock(statement.Body);
+				cil.Append(nop);
+
+			}
+			else throw WrongType(statement, expr, types.Bool);
 		}
 		public void VisitReturn(Return statement)
 		{
-			throw new NotImplementedException();
+			var retType = this.CompileExpression(statement.Expr);
+			if (types.CanAssign(retType, method.ReturnType))
+				cil.Emit(OpCodes.Ret);
+			else throw WrongType(statement, retType, method.ReturnType);
 		}
 		public void VisitWhile(While statement)
 		{
-			throw new NotImplementedException();
+			var end = Instruction.Create(OpCodes.Nop);
+			var compare = Instruction.Create(OpCodes.Nop);
+
+			cil.Append(compare);
+			TypeRef expr = CompileExpression(statement.Condition);
+			if (expr == types.Bool)
+			{
+				cil.Emit(OpCodes.Brfalse, end);
+
+				CompileBlock(statement.Body);
+				cil.Emit(OpCodes.Br, compare);
+			}
+			else throw WrongType(statement, expr, types.Bool);
+			cil.Append(end);
 		}
 		#endregion
 		#region expressions
@@ -85,31 +182,170 @@ namespace Lab3.Compiling
 		}
 		public TypeRef VisitBinary(Binary node)
 		{
-			throw new NotImplementedException();
+			var leftType = CompileExpression(node.Left);
+			var rightType = CompileExpression(node.Right);
+
+			if (node.Operator == BinaryOperator.Equal && (rightType.CanBeNull || leftType.CanBeNull))
+			{
+				if (types.CanAssign(rightType, leftType) || types.CanAssign(leftType, rightType))
+				{
+					cil.Emit(OpCodes.Ceq);
+					return types.Bool;
+				}
+				else throw MakeError(node, "Разные типы");
+			}
+
+			if (leftType == rightType)
+			{
+				switch (node.Operator)
+				{
+					case BinaryOperator.Addition:
+						cil.Emit(OpCodes.Add);
+						return types.Int;
+					case BinaryOperator.Division:
+						cil.Emit(OpCodes.Div);
+						return types.Int;
+					case BinaryOperator.Equal:
+						cil.Emit(OpCodes.Ceq);
+						return types.Bool;
+					case BinaryOperator.Less:
+						cil.Emit(OpCodes.Clt);
+						return types.Bool;
+					case BinaryOperator.Multiplication:
+						cil.Emit(OpCodes.Mul);
+						return types.Int;
+					case BinaryOperator.Remainder:
+						cil.Emit(OpCodes.Rem);
+						return types.Int;
+					case BinaryOperator.Subtraction:
+						cil.Emit(OpCodes.Sub);
+						return types.Int;
+					default:
+						throw MakeError(node, $"Ошибка в Binary {node}");
+				}
+			}
+			else throw WrongType(node, leftType, rightType);
 		}
 		public TypeRef VisitCall(Call expression)
 		{
-			throw new NotImplementedException();
+			var member = expression.Function as MemberAccess;
+			if (member != null)
+			{
+				var obj = this.CompileExpression(member.Obj);
+
+				List<TypeRef> argumentTypes = new List<TypeRef>();
+				foreach (IExpression arg in expression.Arguments)
+					argumentTypes.Add(CompileExpression(arg));
+
+				var methods = this.types.GetCallableMethods(obj, member.Member, argumentTypes);
+				if (methods.Count == 1)
+				{
+					cil.Emit(OpCodes.Call, module.ImportReference(methods[0]));
+					return methods[0].ReturnType;
+				}
+				else
+					throw MakeError(expression, "Не 1 метод");
+			}
+
+			var id = expression.Function as Identifier;
+			if (id != null)
+			{
+				var name = id.Name;
+				List<TypeRef> argTypes = new List<TypeRef>();
+				foreach (var arg in expression.Arguments)
+					argTypes.Add(CompileExpression(arg));
+
+				var fns = types.GetCallableFunctions(name, argTypes);
+				if (fns.Count > 1)
+					throw MakeError(expression, "Не 1 функция");
+
+				if (fns.Count == 1)
+				{
+					cil.Emit(OpCodes.Call, fns[0]);
+					return fns[0].ReturnType;
+				}
+
+				var metType = this.types.TryGetTypeRef(id.Name);
+				if (metType != null)
+				{
+					var constructors = this.types.GetCallableMethods(metType.Value, ".ctor", argTypes);
+					if (constructors.Count == 1)
+					{
+						cil.Emit(OpCodes.Newobj, constructors[0]);
+						return (TypeRef)metType;
+					}
+					else if (constructors.Count > 1)
+						throw MakeError(expression, "У конструкторов одинаковые аргементы");
+				}
+			}
+			throw MakeError(expression, $"Не получилось вызвать {expression.Function.FormattedString}");
 		}
 		public TypeRef VisitParentheses(Parentheses expression)
 		{
-			throw new NotImplementedException();
+			return this.CompileExpression(expression.Expr);
 		}
 		public TypeRef VisitNumber(Number expression)
 		{
-			throw new NotImplementedException();
+			cil.Emit(OpCodes.Ldc_I4, int.Parse(expression.Lexeme));
+			return types.Int;
 		}
 		public TypeRef VisitIdentifier(Identifier expression)
 		{
-			throw new NotImplementedException();
+			var name = expression.Name;
+			switch (name)
+			{
+				case "false":
+					cil.Emit(OpCodes.Ldc_I4, 0);
+					return this.types.Bool;
+				case "true":
+					cil.Emit(OpCodes.Ldc_I4, 1);
+					return this.types.Bool;
+				case "null":
+					cil.Emit(OpCodes.Ldnull);
+					return this.types.Null;
+				case "this":
+					cil.Emit(OpCodes.Ldarg, method.Body.ThisParameter);
+					return this.method.DeclaringType;
+			}
+
+			VariableDefinition variableDefinition;
+			if (variables.TryGetValue(expression.Name, out variableDefinition))
+			{
+				cil.Emit(OpCodes.Ldloc, variableDefinition);
+				return variableDefinition.VariableType;
+			}
+
+			foreach (var par in method.Parameters)
+			{
+				if (par.Name == name)
+				{
+					cil.Emit(OpCodes.Ldarg, par);
+					return par.ParameterType;
+				}
+			}
+			throw MakeError(expression, $"identifier exception {expression.FormattedString}");
 		}
 		public TypeRef VisitMemberAccess(MemberAccess expression)
 		{
-			throw new NotImplementedException();
+			var obj = CompileExpression(expression.Obj);
+			var obj_td = obj.GetTypeDefinition();
+			foreach (var field in obj_td.Fields)
+			{
+				if (field.Name == expression.Member)
+				{
+					cil.Emit(OpCodes.Ldfld, field);
+					return field.FieldType;
+				}
+			}
+			throw MakeError(expression, $"Ошибка тут {expression.Member}");
 		}
 		public TypeRef VisitTypedExpression(TypedExpression expression)
 		{
-			throw new NotImplementedException();
+			var expr = this.CompileExpression(expression.Expr);
+			if (expr.TypeReference == this.types.TryGetTypeRef(expression.Type))
+				return expr.TypeReference;
+			else
+				throw MakeError(expression, $"Неверный тип {expression.FormattedString}");
 		}
 		#endregion
 	}
