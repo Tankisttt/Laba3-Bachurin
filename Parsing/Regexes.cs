@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-namespace Lab3.Parsing
-{
-	sealed class Regexes
-	{
+namespace Lab3.Parsing {
+	sealed class Regexes {
 		readonly IReadOnlyList<Tuple<TokenType, string>> tokenPatterns = new TupleList<TokenType, string> {
 			{ TokenType.Whitespaces, @"[ \t\r\n]+" },
 			{ TokenType.SingleLineComment, @"//[^\r\n]*" },
@@ -17,11 +15,9 @@ namespace Lab3.Parsing
 		public readonly Regex CombinedRegex;
 		public readonly IEnumerable<Tuple<TokenType, string>> TokenGroupNames;
 		public readonly IReadOnlyDictionary<TokenType, Regex> TokenRegexes;
-		Regexes()
-		{
+		Regexes() {
 			var tokenRegexes = new Dictionary<TokenType, Regex>();
-			foreach (var tp in tokenPatterns)
-			{
+			foreach (var tp in tokenPatterns) {
 				var tokenType = tp.Item1;
 				var pattern = tp.Item2;
 				var regex = RegexUtils.CreateRegex(@"\A(" + pattern + @")\z");
