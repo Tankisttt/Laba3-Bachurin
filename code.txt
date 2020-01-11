@@ -1,0 +1,69 @@
+class Point {
+	int x;
+	int y;
+	Point Add(Point p) {
+		newX = this.x+p.x;
+		p = Point(newX, this.y+p.y);
+		return p;
+	}
+}
+class Node {
+	int value;
+	Node next;
+}
+func void dump(Point p) {
+	dump(p.x);
+	dump(p.y);
+	dump();
+}
+func int fib(int x) {
+	if (x < 2) {
+		return x;
+	}
+	return fib(x - 1) + fib(x - 2);
+}
+dump();
+dump(7+3);
+dump(7-3);
+dump(7*3);
+dump(7/3);
+dump(7%3);
+dump(1==1);
+dump(1==2);
+dump(1<1);
+dump(1<2);
+dump(false==false);
+dump(false==true);
+dump(false<true);
+dump(null==null);
+dump(trace(trace(13) == 13));
+i = 0;
+while (i < 10) {
+	dump(i);
+	dump(fib(i));
+	dump();
+	i = i + 1;
+}
+t = Node(1, null);
+dump(t == null);
+t = null;
+dump(t == null);
+t = Node(11, Node(12, Node(13, null)));
+while ((t == null) == false) {
+	t.value = t.value + 100;
+	dump(t.value);
+	t = t.next;
+}
+t = Node(1, Node(2, null));
+t.value = 11;
+t.next = null;
+dump(t.value == 11);
+dump(t.next == null);
+dump(Point(1, 2));
+dump(Point(1, 2).Add(Point(10, 20)));
+dump(Point(1::int, 2::int)::Point.Add(Point(10::int, 20::int)::Point)::Point)::void;
+p:int = 5::int+4::int::int+5::int::int;
+dump(p);
+dump(t.next == null::Null::bool);
+/*
+*/

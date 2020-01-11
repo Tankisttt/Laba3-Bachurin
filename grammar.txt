@@ -1,0 +1,72 @@
+*Program:
+	Declaration*
+	Statement*
+Declaration:
+	ClassDeclaration
+	FunctionDeclaration
+ClassDeclaration:
+	'class' Identifier '{' ClassMember* '}'
+ClassMember:
+	Field
+	Method
+Field:
+	Type Identifier ';'
+Method:
+	Type Identifier '(' Parameters? ')' Block
+FunctionDeclaration:
+	'func' Type Identifier '(' Parameters? ')' Block
+Parameters:
+	(Parameters ',')? Parameter
+Parameter:
+	Type Identifier
+Type:
+	Identifier
+Statement:
+	ExpressionStatement
+	Assignment
+	If
+	While
+	Return
+ExpressionStatement:
+	Expression ';'
+Assignment:
+	Identifier '=' Expression ';'
+	MemberAccess '=' Expression ';'
+If:
+	'if' '(' Expression ')' Block
+While:
+	'while' '(' Expression ')' Block
+Return:
+	'return' Expression? ';'
+Block:
+	'{' Statement* '}'
+ExpressionType:
+	'::' Type
+Expession:
+	Equality
+Equality:
+	Equality "==" Relational ExpressionType?
+	Relational
+Relational:
+	Relational "<" Additive ExpressionType?
+	Additive
+Additive:
+	Additive ("+"|"-") Multiplicative ExpressionType?
+	Multiplicative
+Multiplicative:
+	Multiplicative ("*"|"/"|"%") Primary ExpressionType?
+	Primary
+Primary:
+	Call
+	MemberAccess
+	Primitive
+Call:
+	Primary '(' Arguments? ')' ExpressionType?
+Arguments:
+	(Arguments ',')? Expression
+MemberAccess:
+	Primary '.' Identifier ExpressionType?
+Primitive:
+	'(' Expression ')' ExpressionType?
+	Number ExpressionType?
+	Identifier ExpressionType?
