@@ -10,7 +10,7 @@ namespace Lab3.Parsing {
 			{ TokenType.MultiLineComment, @"/\*.*?\*/" },
 			{ TokenType.Identifier, @"[a-zA-Z_][a-zA-Z_0-9]*" },
 			{ TokenType.NumberLiteral, @"[0-9]+" },
-			{ TokenType.OperatorOrPunctuator, @"==|::|[-+*/%.<,=;:(){}]" },
+			{ TokenType.OperatorOrPunctuator, @":=|==|::|[-+*/%.<,=;:(){}]" },
 		};
 		public readonly Regex CombinedRegex;
 		public readonly IEnumerable<Tuple<TokenType, string>> TokenGroupNames;

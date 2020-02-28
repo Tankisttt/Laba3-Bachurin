@@ -16,8 +16,12 @@ namespace Lab3.Compiling
 		readonly ModuleDefinition module;
 		readonly MethodDefinition method;
 		readonly ILProcessor cil;
-		readonly Dictionary<string, VariableDefinition> variables
-			= new Dictionary<string, VariableDefinition>();
+		
+		readonly Dictionary<string, Stack<VariableDefinition>> variables
+			= new Dictionary<string, Stack<VariableDefinition>>();
+
+		readonly Stack<List<string>> delVariables = new Stack<List<string>>();
+		
 		MethodBodyCompiler(SourceFile sourceFile, AllTypes types, MethodDefinition method)
 		{
 			this.sourceFile = sourceFile;
@@ -25,6 +29,8 @@ namespace Lab3.Compiling
 			module = types.Module;
 			this.method = method;
 			cil = method.Body.GetILProcessor();
+
+			delVariables.Push(new List<string>());
 		}
 		public static void Compile(
 			SourceFile sourceFile,
@@ -37,9 +43,10 @@ namespace Lab3.Compiling
 		}
 
 		void CompileMethodStatements(IEnumerable<IStatement> statements)
-		{
+		{ 
 			foreach (var st in statements)
 				CompileStatement(st);
+
 			cil.Emit(OpCodes.Ret);
 		}
 		Exception MakeError(INode node, string message)
@@ -60,79 +67,95 @@ namespace Lab3.Compiling
 		}
 		void CompileBlock(Block block)
 		{
+			delVariables.Push(new List<string>());
+
 			foreach (var statement in block.Statements)
 				statement.Accept(this);
+			var list_del = delVariables.Pop();
+			foreach(var v in list_del)
+			{
+				variables[v].Pop();
+				if (variables[v].Count == 0)
+					variables.Remove(v);
+			}
+			
 		}
 		public void VisitAssignment(Assignment statement)
 		{
-			var id = statement.Target as Identifier;
-			if (id != null)
+			if (statement.Operator == "=")
 			{
-				TypeRef exprType = CompileExpression(statement.Expr);
-				VariableDefinition newVar;
-				TypeRef? typeToCompare;
-				if (variables.ContainsKey(id.Name))
+				var identifier = statement.Target as Identifier;
+				if (identifier != null)
 				{
-					if (statement.Type != null)
+					var exprType = CompileExpression(statement.Expr);
+					var name = identifier.Name;
+					VariableDefinition variableDefinition;
+
+					if (!variables.ContainsKey(name))
 					{
-						typeToCompare = types.TryGetTypeRef(statement.Type);
-						if (typeToCompare == null) 
-							throw MakeError(statement.Type, "wrong type");
+						variables[name] = new Stack<VariableDefinition>();
 					}
-					else
-						typeToCompare = variables[id.Name].VariableType;
 
-					if (variables[id.Name].VariableType != typeToCompare.Value)
-						throw MakeError(statement.Type, "wrong type");
-
-					if (types.CanAssign(exprType, typeToCompare.Value))
-						newVar = variables[id.Name];
-					else
-						throw WrongType(statement, exprType, typeToCompare.Value);
+					variableDefinition = new VariableDefinition(module.ImportReference(exprType.TypeReference));
+					method.Body.Variables.Add(variableDefinition);
+					variables[name].Push(variableDefinition);
+					delVariables.Peek().Add(name);
+					cil.Emit(OpCodes.Stloc, variableDefinition);
 				}
 				else
 				{
+					var member = statement.Target as MemberAccess;
+					var obj = CompileExpression(member.Obj);
+					var typeDef = obj.GetTypeDefinition();
+					TypeRef exprType = CompileExpression(statement.Expr);
+					foreach (var field in typeDef.Fields)
+					{
+						if (field.Name == member.Member)
+						{
+							if (types.CanAssign(exprType, field.FieldType))
+							{
+								cil.Emit(OpCodes.Stfld, field);
+							}
+							else
+							{
+								throw WrongType(statement, exprType, field.FieldType);
+							}
+							return;
+						}
+					}
+				}
+			}
+			else
+			{
+				var identifier = statement.Target as Identifier;
+				if (identifier != null)
+				{
+					var expression = CompileExpression(statement.Expr);
+					var name = identifier.Name;
+					VariableDefinition variableDefinition;
+					TypeRef? typeToCompare;
 					if (statement.Type != null)
 					{
 						typeToCompare = types.TryGetTypeRef(statement.Type);
-
-						if (typeToCompare == null)
-							throw MakeError(statement.Type, "wrong type");
-
-						if (!types.CanAssign(exprType, typeToCompare.Value))
-							throw WrongType(statement, exprType, typeToCompare.Value);
+						if (typeToCompare == null) throw MakeError(statement.Type, "wrong type");
 					}
 					else
-						typeToCompare = exprType.TypeReference;
+						typeToCompare = variables[identifier.Name].Peek().VariableType;
 
-					newVar = new VariableDefinition(typeToCompare.Value.TypeReference);
-					method.Body.Variables.Add(newVar);
-					variables[id.Name] = newVar;
-				}
+					if (variables[identifier.Name].Peek().VariableType != typeToCompare.Value)
+						throw MakeError(statement.Type, "wrong type");
 
-				cil.Emit(OpCodes.Stloc, newVar);
-				return;
-			}
-			var member = statement.Target as MemberAccess;
-			if (member != null)
-			{
-				var obj = CompileExpression(member.Obj);
-				var typeDef = obj.GetTypeDefinition();
-				TypeRef exprType = CompileExpression(statement.Expr);
-				foreach (var field in typeDef.Fields)
-				{
-					if (field.Name == member.Member)
-					{
-						if (types.CanAssign(exprType, field.FieldType))
-							cil.Emit(OpCodes.Stfld, field);		
-						else
-							throw WrongType(statement, exprType, field.FieldType);
-						return;
-					}
+
+					if (!variables.ContainsKey(name))
+						throw MakeError(statement, "Присваивание в несуществующую переменную");
+					variableDefinition = variables[name].Peek();
+					cil.Emit(OpCodes.Stloc, variableDefinition);
 				}
+				else
+					throw MakeError(statement, $"{statement.Target.FormattedString}");
 			}
-			throw MakeError(statement, $"{statement.Target.FormattedString}");
 		}
+
 		public void VisitExpressionStatement(ExpressionStatement statement)
 		{
 			var t = CompileExpression(statement.Expr);
@@ -152,6 +175,8 @@ namespace Lab3.Compiling
 
 			}
 			else throw WrongType(statement, expr, types.Bool);
+
+					
 		}
 		public void VisitReturn(Return statement)
 		{
@@ -190,8 +215,7 @@ namespace Lab3.Compiling
 
 			if (node.Operator == BinaryOperator.Equal && (rightType.CanBeNull || leftType.CanBeNull))
 			{
-				if (types.CanAssign(rightType, leftType) || types.CanAssign(leftType, rightType))
-				{
+				if (types.CanAssign(rightType, leftType) || types.CanAssign(leftType, rightType)) {
 					cil.Emit(OpCodes.Ceq);
 					return types.Bool;
 				}
@@ -289,7 +313,6 @@ namespace Lab3.Compiling
 		}
 		TypeRef IExpressionVisitor<TypeRef>.VisitNumber(Number expression)
 		{
-			
 			cil.Emit(OpCodes.Ldc_I4, int.Parse(expression.Lexeme));
 			return types.Int;
 		}
@@ -312,11 +335,11 @@ namespace Lab3.Compiling
 					return this.method.DeclaringType;
 			}
 
-			VariableDefinition variableDefinition;
-			if (variables.TryGetValue(expression.Name, out variableDefinition))
+			Stack<VariableDefinition> variableDefinition;
+			if (variables.TryGetValue(name, out variableDefinition))
 			{
-				cil.Emit(OpCodes.Ldloc, variableDefinition);
-				return variableDefinition.VariableType;
+				cil.Emit(OpCodes.Ldloc, variableDefinition.Peek());
+				return variableDefinition.Peek().VariableType;
 			}
 
 			foreach (var par in method.Parameters)
