@@ -30,7 +30,7 @@ Statement:
 ExpressionStatement:
 	Expression ';'
 Assignment:
-	Identifier '=' Expression ';'
+	Identifier ('='|':=') Expression ';'
 	MemberAccess '=' Expression ';'
 If:
 	'if' '(' Expression ')' Block

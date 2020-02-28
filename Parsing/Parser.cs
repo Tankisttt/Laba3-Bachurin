@@ -217,15 +217,25 @@ namespace Lab3.Parsing
 			{
 				return new ExpressionStatement(pos, expression);
 			}
+			IExpression restAssigmentExpression;
 			TypeNode type = null;
 			if (SkipIf(":"))
 			{
 				type = ParseType();
+				Expect("=");
+				restAssigmentExpression = ParseExpression();
+				Expect(";");
+				return new Assignment(pos, expression, type, restAssigmentExpression, "=");
+			}
+			if (SkipIf(":=")) {
+				restAssigmentExpression = ParseExpression();
+				Expect(";");
+				return new Assignment(pos, expression, type, restAssigmentExpression, ":=");
 			}
 			Expect("=");
-			var restAssigmentExpression = ParseExpression();
+			restAssigmentExpression = ParseExpression();
 			Expect(";");
-			return new Assignment(pos, expression, type, restAssigmentExpression);
+			return new Assignment(pos, expression, type, restAssigmentExpression, "=");
 		}
 		TypeNode ParseType()
 		{
